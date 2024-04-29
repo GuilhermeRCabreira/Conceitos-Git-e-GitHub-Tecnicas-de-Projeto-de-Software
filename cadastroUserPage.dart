@@ -1,13 +1,18 @@
 import 'dart:io';
+
 import 'package:brasil_fields/brasil_fields.dart';
+import 'package:carteira_saude/pages/homePage.dart';
 import 'package:carteira_saude/pages/login/login_screen.dart';
 import 'package:carteira_saude/pages/snackBar/showSnackBar.dart';
 import 'package:carteira_saude/services/user_auth/firebase_auth_implementation/firebase_auth_services.dart';
+import 'package:carteira_saude/storage/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get_utils/src/get_utils/get_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -17,34 +22,30 @@ class CadastroUserPage extends StatefulWidget {
 }
 
 class _CadastroUserPageState extends State<CadastroUserPage> {
-  // Controllers para os campos de texto
   final TextEditingController _nomeController = TextEditingController();
   final TextEditingController _sobrenomeController = TextEditingController();
   final TextEditingController _cpfController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _senhaController = TextEditingController();
   final TextEditingController _senhaConfController = TextEditingController();
-
-  // Flag para exibir ou não a senha
   bool _showPassword = false;
 
-  // Data de nascimento selecionada pelo usuário
-  DateTime selectedDate = DateTime.now();
-  final DateFormat dateFormatter = DateFormat('dd/MM/yyyy');
-
-  // Método renomeado para limpar os campos de texto
-  void _limparCampos() {
+  void _limpar() {
     setState(() {
       _nomeController.clear();
       _sobrenomeController.clear();
       _cpfController.clear();
+      _dataNascController.clear();
       _emailController.clear();
       _senhaController.clear();
       _senhaConfController.clear();
     });
   }
 
-  // Método para selecionar a data de nascimento
+  DateTime selectedDate = DateTime.now();
+  final DateFormat dateFormatter = DateFormat('dd/MM/yyyy');
+  final TextEditingController _dataNascController = TextEditingController();
+
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -53,38 +54,34 @@ class _CadastroUserPageState extends State<CadastroUserPage> {
       lastDate: DateTime(2101),
     );
 
-    if (picked != null && picked != selectedDate) {
+    if (picked != null && picked != selectedDate)
       setState(() {
         selectedDate = picked;
-        _dataNascController.text = dateFormatter.format(selectedDate);
+        print(_dataNascController.text = dateFormatter.format(selectedDate));
       });
-    }
   }
 
   @override
   void dispose() {
     _nomeController.dispose();
     _sobrenomeController.dispose();
-    _cpfController.dispose();
+    _dataNascController.dispose();
     _emailController.dispose();
+    _cpfController.dispose();
     _senhaController.dispose();
     _senhaConfController.dispose();
+
     super.dispose();
   }
 
-  // Serviço de autenticação
   FirebaseAuthService authService = FirebaseAuthService();
 
-  // Cores utilizadas na interface
   Color tituloColor = Color.fromARGB(255, 40, 78, 121);
   Color textColor = Colors.black;
   Color fundoColor = Color.fromARGB(255, 239, 239, 239);
   Color textoBotao = Colors.white;
-
-  // URL padrão para a foto do usuário
   String? urlPhoto;
 
-  // Método para realizar o upload de uma imagem a partir de uma URL
   Future<void> uploadFromUrl() async {
     final imageUrl =
         'https://static.vecteezy.com/ti/vetor-gratis/p1/18765757-icone-de-perfil-de-usuario-em-estilo-simples-ilustracao-em-avatar-membro-no-fundo-isolado-conceito-de-negocio-de-sinal-de-permissao-humana-vetor.jpg';
@@ -100,7 +97,6 @@ class _CadastroUserPageState extends State<CadastroUserPage> {
     print("Imagem salva");
   }
 
-  // Método para criar um novo usuário, modificado para retornar um bool para indicar se foi criado.
   Future<bool?> _criarUsuario({
     required String email,
     required String senha,
@@ -110,22 +106,20 @@ class _CadastroUserPageState extends State<CadastroUserPage> {
     required String dataNasc,
   }) async {
     String? erro = await authService.cadastrarUsuario(
-      email: email,
-      senha: senha,
-      cpf: cpf,
-    );
+        email: email, senha: senha, cpf: cpf);
     if (erro == null) {
-      print("Usuário criado com sucesso");
+      print("Funcionou");
       authService.adUsuarioInfos(nome, sobrenome, cpf, dataNasc, email);
       uploadFromUrl();
+      print("##################################################Vamo");
       return true;
     } else {
-      print("Erro ao criar usuário: $erro");
+      print("###############################################deu ruim" + erro);
+      print("###############################################" + erro);
       return false;
     }
   }
 
-  // Método para verificar se as senhas coincidem e têm pelo menos 6 caracteres
   bool confirmacaoSenha() {
     if (_senhaController.text.trim() == _senhaConfController.text.trim() &&
         _senhaController.text.length > 6) {
@@ -137,6 +131,7 @@ class _CadastroUserPageState extends State<CadastroUserPage> {
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController? controller;
     return Scaffold(
       body: Container(
         height: MediaQuery.of(context).size.height,
@@ -317,6 +312,19 @@ class _CadastroUserPageState extends State<CadastroUserPage> {
                           ),
                         ),
                       ),
+                      validator: (value) {
+                        if (value == null || value == "") {
+                          return "O valor de e-mail deve ser preenchido";
+                        }
+                        if (!value.contains("@") ||
+                            !value.contains(".") ||
+                            value.length < 4) {
+                          showSnackBar(
+                              context: context,
+                              mensagem: "O e-mail deve ser válido.");
+                        }
+                        return null;
+                      },
                     ),
                     TextFormField(
                       controller: _senhaController,
@@ -399,7 +407,7 @@ class _CadastroUserPageState extends State<CadastroUserPage> {
                         ),
                       ),
                       obscureText: _showPassword == false ? true : false,
-                    ),
+                    )
                   ],
                 ),
               ),
@@ -431,17 +439,24 @@ class _CadastroUserPageState extends State<CadastroUserPage> {
                   } else {
                     showSnackBar(
                         context: context,
-                        mensagem: "Erro ao criar usuário!",
-                        isErro: true);
+                        mensagem: "Usuário criado com sucesso!",
+                        isErro: false);
                   }
-                  _limparCampos();
+                  _limpar();
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
                       builder: (context) => LoginScreen(),
                     ),
                   );
                 },
-                // Outros atributos do ElevatedButton
+                style: ElevatedButton.styleFrom(
+                  primary: tituloColor,
+                  onPrimary: textoBotao,
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                ),
                 child: Text(
                   "Criar conta",
                   style: TextStyle(
